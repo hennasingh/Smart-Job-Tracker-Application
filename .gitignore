@@ -11,3 +11,7 @@ wheels/
 
 # Environment variables
 .env
+
+# Credentials
+credentials.json
+token.json
