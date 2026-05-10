@@ -1,0 +1,9 @@
+[project]
+name = "job-tracker"
+version = "0.1.0"
+description = "Multi-agent job application tracker using Google ADK and Gemini"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "google-adk>=1.33.0",
+]
