@@ -177,4 +177,3 @@ Rows are keyed on **Company + Role** — re-running the agent will update existi
 | `google-auth-oauthlib` | OAuth 2.0 authentication flow |
 | `google-auth-httplib2` | HTTP transport for Google auth |
 | `python-dotenv` | Load environment variables from `.env` |
-| `fastapi` / `uvicorn` | Web server used by `adk web` |
