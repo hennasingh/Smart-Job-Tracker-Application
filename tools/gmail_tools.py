@@ -63,7 +63,7 @@ def _decode_body(payload: dict) -> str:
 # Tool 1: scan_recruiter_emails
 # ---------------------------------------------------------------------------
 
-def scan_recruiter_emails(days: int = 30, max_results: int = 20) -> dict:
+def scan_recruiter_emails(days: int = 30, max_results: int = 3) -> dict:
     """
     Search Gmail for recruiter and job-application emails received within
     the last `days` days (default 30).
@@ -283,4 +283,41 @@ def extract_job_details(subject: str, sender: str, body: str) -> dict:
         "status":      status,
         "confidence":  confidence,
         "raw_subject": subject,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool 4: fetch_and_classify_email  (combined — saves one LLM turn per email)
+# ---------------------------------------------------------------------------
+
+def fetch_and_classify_email(message_id: str) -> dict:
+    """
+    Fetch the full body of an email AND run heuristic classification in a
+    single call.  Use this instead of calling get_email_details() and
+    extract_job_details() separately — it halves the number of tool calls
+    needed per email.
+
+    Args:
+        message_id: The Gmail message ID from scan_recruiter_emails().
+
+    Returns:
+        A merged dict with all fields from get_email_details() plus the
+        classification fields: company, role, job_status, confidence.
+    """
+    details = get_email_details(message_id)
+    if details.get("status") == "error":
+        return details
+
+    classification = extract_job_details(
+        subject=details.get("subject", ""),
+        sender=details.get("sender", ""),
+        body=details.get("body", ""),
+    )
+
+    return {
+        **details,
+        "company":    classification["company"],
+        "role":       classification["role"],
+        "job_status": classification["status"],   # renamed to avoid clash with http status
+        "confidence": classification["confidence"],
     }

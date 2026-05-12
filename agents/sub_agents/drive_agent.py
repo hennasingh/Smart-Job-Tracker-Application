@@ -24,7 +24,7 @@ from tools.drive_tools import (
 
 drive_agent = Agent(
     name="drive_agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
 
     description=(
         "Writes job application data to the Google Sheet tracker. "

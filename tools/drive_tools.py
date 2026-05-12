@@ -20,7 +20,7 @@ load_dotenv()
 
 TOKEN_PATH = "token.json"
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
-SHEET_NAME = "Job Applications"
+SHEET_NAME = "job_applications"
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -46,7 +46,7 @@ def _read_all_rows(service) -> list[list]:
     result = (
         service.spreadsheets()
         .values()
-        .get(spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!A:F")
+        .get(spreadsheetId=SPREADSHEET_ID, range=f"'{SHEET_NAME}'!A:F")
         .execute()
     )
     return result.get("values", [])
@@ -66,14 +66,35 @@ def ensure_sheet_headers() -> dict:
     """
     try:
         service = _get_sheets_service()
-        rows = _read_all_rows(service)
+
+        try:
+            rows = _read_all_rows(service)
+        except Exception as e:
+            if "Unable to parse range" in str(e):
+                # The sheet probably doesn't exist. Let's create it.
+                body = {
+                    "requests": [{
+                        "addSheet": {
+                            "properties": {
+                                "title": SHEET_NAME
+                            }
+                        }
+                    }]
+                }
+                service.spreadsheets().batchUpdate(
+                    spreadsheetId=SPREADSHEET_ID,
+                    body=body
+                ).execute()
+                rows = []
+            else:
+                raise e
 
         if rows and rows[0] == HEADERS:
             return {"status": "success", "message": "Headers already present"}
 
         service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A1",
+            range=f"'{SHEET_NAME}'!A1",
             valueInputOption="RAW",
             body={"values": [HEADERS]},
         ).execute()
@@ -128,7 +149,7 @@ def upsert_job_row(
             ):
                 service.spreadsheets().values().update(
                     spreadsheetId=SPREADSHEET_ID,
-                    range=f"{SHEET_NAME}!A{i}:F{i}",
+                    range=f"'{SHEET_NAME}'!A{i}:F{i}",
                     valueInputOption="RAW",
                     body={"values": [new_row]},
                 ).execute()
@@ -137,7 +158,7 @@ def upsert_job_row(
         # No match — append a new row
         service.spreadsheets().values().append(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"{SHEET_NAME}!A:F",
+            range=f"'{SHEET_NAME}'!A:F",
             valueInputOption="RAW",
             insertDataOption="INSERT_ROWS",
             body={"values": [new_row]},
@@ -165,6 +186,7 @@ def get_all_jobs() -> dict:
     """
     try:
         service = _get_sheets_service()
+        ensure_sheet_headers()
         rows = _read_all_rows(service)
 
         if len(rows) <= 1:

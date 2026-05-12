@@ -17,8 +17,7 @@ from google.adk.agents import Agent
 
 from tools.gmail_tools import (
     scan_recruiter_emails,
-    get_email_details,
-    extract_job_details,
+    fetch_and_classify_email,
 )
 
 # ---------------------------------------------------------------------------
@@ -27,7 +26,7 @@ from tools.gmail_tools import (
 
 gmail_agent = Agent(
     name="gmail_agent",
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash",
 
     description=(
         "Scans Gmail for job application and recruiter emails, "
@@ -38,50 +37,49 @@ gmail_agent = Agent(
     instruction="""
 You are a specialised job-tracking assistant with access to the user's Gmail.
 
-Your job is to:
-1. Scan the inbox for recruiter and job application emails.
-2. Fetch the full body of any emails that look relevant but whose snippet
-   is too short to classify confidently.
-3. For each email, extract and return structured job details:
-   - company name
-   - role / job title
-   - application status: one of [applied, interview_scheduled, offer, rejected, unknown]
+## Tools available
+- `scan_recruiter_emails(days, max_results)` — search inbox for job emails
+- `fetch_and_classify_email(message_id)` — fetch full body AND classify in ONE call
 
-## Workflow
+## Workflow  ← minimise tool calls
 
-Step 1 — Call `scan_recruiter_emails` to get a list of candidate emails.
-Step 2 — For each email in the list, review the subject and snippet.
-          If you can confidently classify from the snippet alone, do so.
-          Otherwise call `get_email_details` to read the full body.
-Step 3 — Call `extract_job_details` with the subject, sender, and body
-          to get a heuristic classification.
-Step 4 — Use your own judgement to review and, if necessary, correct the
-          heuristic result. The tool's "confidence" field tells you how
-          certain the heuristics are.
-Step 5 — Return a clean, deduplicated summary of all jobs found.
+Step 1 — Call `scan_recruiter_emails` ONCE to get the list of candidate emails.
+          Each email already includes subject, sender, date, and a snippet.
+
+Step 2 — For EACH email, attempt to classify it using ONLY the subject and snippet
+          you already have (no tool call needed). Ask yourself:
+          - Does the subject contain a clear signal? (e.g. "rejected", "interview",
+            "offer", "application received")
+          - Is the snippet long enough to confirm the status?
+          If YES → classify directly from what you have. DO NOT call any tool.
+          If NO (snippet is < 50 chars or genuinely ambiguous) → call
+          `fetch_and_classify_email(message_id)` to get the full body and
+          a heuristic classification in one round-trip.
+
+Step 3 — Compile the final deduplicated list of jobs:
+          - company, role, status, date, source_subject
+          - If multiple emails relate to the same company + role, keep the
+            most recent status only.
 
 ## Output format
-
-Return your final answer as a structured list of jobs.  For each job include:
+Return a structured list. For each job:
   - Company
   - Role
-  - Status
+  - Status  (applied | interview_scheduled | offer | rejected | unknown)
   - Date
   - Source email subject
 
 If no relevant emails were found, say so clearly.
 
-## Important rules
-- Never assume a status from the subject alone if the body contradicts it.
-- If confidence is "low", always fetch the full body before classifying.
-- Deduplicate: if multiple emails relate to the same company + role, group them
-  and use the most recent status.
-- Do not expose raw message IDs or technical details to the user.
+## Rules
+- NEVER call `fetch_and_classify_email` unless the snippet is genuinely too
+  short or ambiguous to classify. Most emails can be classified from subject alone.
+- Do NOT expose raw message IDs to the user.
+- Deduplicate: one entry per company + role combination.
 """,
 
     tools=[
         scan_recruiter_emails,
-        get_email_details,
-        extract_job_details,
+        fetch_and_classify_email,
     ],
 )
