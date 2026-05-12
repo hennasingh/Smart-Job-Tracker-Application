@@ -15,3 +15,6 @@ wheels/
 # Credentials
 credentials.json
 token.json
+
+*.adk
+*.db
