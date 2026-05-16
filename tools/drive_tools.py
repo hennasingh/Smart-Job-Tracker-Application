@@ -1,9 +1,10 @@
 # tools/drive_tools.py
 #
-# Three ADK-compatible tools for the drive_agent:
+# ADK-compatible tools for the drive_agent:
 #   1. ensure_sheet_headers  — make sure the Sheet has the right column headings
-#   2. upsert_job_row        — add or update a job row (keyed on company + role)
-#   3. get_all_jobs          — read all rows back as a list of dicts
+#   2. batch_upsert_jobs     — upsert all jobs in 2-3 API calls (preferred)
+#   3. upsert_job_row        — single-row upsert (kept for targeted updates)
+#   4. get_all_jobs          — read all rows back as a list of dicts
 
 import os
 from datetime import datetime, timezone
@@ -106,7 +107,102 @@ def ensure_sheet_headers() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Tool 2: upsert_job_row
+# Tool 2: batch_upsert_jobs
+# ---------------------------------------------------------------------------
+
+def batch_upsert_jobs(jobs: list[dict]) -> dict:
+    """
+    Upsert multiple job rows using at most 3 API calls regardless of how many
+    jobs are provided: one read, one batchUpdate for existing rows, one append
+    for new rows.
+
+    Each job dict must have keys:
+        company, role, status, date, source_subject
+
+    Rows are keyed on company + role (case-insensitive). Existing rows are
+    updated in-place; new rows are appended.
+
+    Args:
+        jobs: List of job dicts.
+
+    Returns:
+        A dict with "status", "added", "updated", and "errors".
+    """
+    try:
+        service = _get_sheets_service()
+        ensure_sheet_headers()
+
+        rows = _read_all_rows(service)
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        # Build lookup: (company_lower, role_lower) -> 1-based sheet row index
+        existing = {}
+        for i, row in enumerate(rows[1:], start=2):
+            c = row[0].strip().lower() if len(row) > 0 else ""
+            r = row[1].strip().lower() if len(row) > 1 else ""
+            existing[(c, r)] = i
+
+        updates = []  # (row_index, new_row)
+        inserts = []  # new_row
+        errors = []
+
+        for job in jobs:
+            try:
+                company = str(job.get("company", "")).strip()
+                role = str(job.get("role", "")).strip()
+                new_row = [
+                    company,
+                    role,
+                    str(job.get("status", "unknown")),
+                    str(job.get("date", "")),
+                    str(job.get("source_subject", "")),
+                    now,
+                ]
+                key = (company.lower(), role.lower())
+                if key in existing:
+                    updates.append((existing[key], new_row))
+                else:
+                    inserts.append(new_row)
+            except Exception as e:
+                errors.append({"job": job, "error": str(e)})
+
+        if updates:
+            service.spreadsheets().values().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body={
+                    "valueInputOption": "RAW",
+                    "data": [
+                        {
+                            "range": f"'{SHEET_NAME}'!A{idx}:F{idx}",
+                            "values": [row],
+                        }
+                        for idx, row in updates
+                    ],
+                },
+            ).execute()
+
+        if inserts:
+            service.spreadsheets().values().append(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'{SHEET_NAME}'!A:F",
+                valueInputOption="RAW",
+                insertDataOption="INSERT_ROWS",
+                body={"values": inserts},
+            ).execute()
+
+        return {
+            "status": "success",
+            "added": len(inserts),
+            "updated": len(updates),
+            "errors": errors,
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Tool 3: upsert_job_row
 # ---------------------------------------------------------------------------
 
 def upsert_job_row(
