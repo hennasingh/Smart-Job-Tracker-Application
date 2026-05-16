@@ -112,6 +112,8 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser and sta
 
 Specify any time window in your prompt — the agent will pass it through automatically. Up to 50 emails are scanned per request. The agent will scan Gmail, update your Google Sheet, and respond with a formatted summary.
 
+<img width="874" height="647" alt="image" src="https://github.com/user-attachments/assets/49691e56-7155-4c81-906e-3ab0f12cb254" />
+
 ### Running Individual Sub-Agents (for testing)
 
 ```bash
