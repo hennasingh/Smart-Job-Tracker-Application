@@ -63,7 +63,7 @@ def _decode_body(payload: dict) -> str:
 # Tool 1: scan_recruiter_emails
 # ---------------------------------------------------------------------------
 
-def scan_recruiter_emails(days: int = 30, max_results: int = 3) -> dict:
+def scan_recruiter_emails(days: int = 30, max_results: int = 50) -> dict:
     """
     Search Gmail for recruiter and job-application emails received within
     the last `days` days (default 30).
@@ -77,7 +77,7 @@ def scan_recruiter_emails(days: int = 30, max_results: int = 3) -> dict:
 
     Args:
         days:        How many days back to search (default 30).
-        max_results: Maximum number of emails to return (default 20).
+        max_results: Maximum number of emails to return (default 50).
 
     Returns:
         A dict with keys "status", "count", and "emails".
