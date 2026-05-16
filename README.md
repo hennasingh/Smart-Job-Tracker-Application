@@ -103,11 +103,14 @@ uv run adk web
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser and start a conversation with the `job_tracker` agent.
 
-**Example prompt:**
+**Example prompts:**
 
 > "Scan my inbox for job applications from the last 30 days and update my tracker."
+> "Scan my inbox for job applications from the last 90 days and update my tracker."
+> "Check my inbox for any interview invitations or offers in the last 14 days."
+> "Show me everything currently in my job tracker sheet."
 
-The agent will scan Gmail, update your Google Sheet, and respond with a formatted summary.
+Specify any time window in your prompt — the agent will pass it through automatically. Up to 50 emails are scanned per request. The agent will scan Gmail, update your Google Sheet, and respond with a formatted summary.
 
 ### Running Individual Sub-Agents (for testing)
 
@@ -133,7 +136,7 @@ Smart-Job-Tracker-Application/
 │       └── summary_agent.py      # Produces the final Markdown report
 ├── tools/
 │   ├── gmail_tools.py            # Gmail API tools (scan, fetch, classify)
-│   └── drive_tools.py            # Sheets API tools (headers, upsert, read)
+│   └── drive_tools.py            # Sheets API tools (headers, batch upsert, read)
 ├── authenticate.py               # One-time OAuth2 setup script
 ├── pyproject.toml
 └── .env                          # Your local config (not committed)
